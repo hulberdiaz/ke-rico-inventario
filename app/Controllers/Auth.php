@@ -39,30 +39,14 @@ class Auth extends BaseController
             return redirect()->back()->with('error', 'La cuenta está bloqueada temporalmente.');
         }
 
-        if ($bloqueadoHasta !== false && $bloqueadoHasta <= time()) {
-            if (! $usuarioModel->update($user['id'], [
-                'intentos_fallidos' => 0,
-                'bloqueado_hasta'   => null,
-            ])) {
-                return redirect()->back()->with('error', 'No se pudo actualizar el acceso. Inténtalo de nuevo.');
-            }
-
-            $user['intentos_fallidos'] = 0;
-        }
-
         if (! password_verify($clave, $user['password_hash'])) {
-            $intentosFallidos = (int) $user['intentos_fallidos'] + 1;
-            $actualizacion = ['intentos_fallidos' => $intentosFallidos];
-            $bloqueoAplicado = $intentosFallidos >= self::MAX_INTENTOS_FALLIDOS;
+            $bloqueoAplicado = $usuarioModel->registrarIntentoFallido(
+                (int) $user['id'],
+                self::MAX_INTENTOS_FALLIDOS,
+                self::DURACION_BLOQUEO_MINUTOS
+            );
 
-            if ($bloqueoAplicado) {
-                $actualizacion['bloqueado_hasta'] = date(
-                    'Y-m-d H:i:s',
-                    time() + self::DURACION_BLOQUEO_MINUTOS * 60
-                );
-            }
-
-            if (! $usuarioModel->update($user['id'], $actualizacion)) {
+            if ($bloqueoAplicado === null) {
                 return redirect()->back()->with('error', 'No se pudo registrar el intento de acceso. Inténtalo de nuevo.');
             }
 
